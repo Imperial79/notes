@@ -1,6 +1,6 @@
 # notes
 
-A new Flutter project.
+A Simple Notes. app created using Flutter + Dart + Firebase.
 
 ## Getting Started
 
