@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speed_dial_fab/speed_dial_fab.dart';
 import 'constants.dart';
 import 'createNoteUi.dart';
-import 'editNoteContentUi.dart';
 import 'globalColors.dart';
 import 'services/auth.dart';
 import 'services/database.dart';
