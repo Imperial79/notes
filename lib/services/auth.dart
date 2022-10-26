@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:page_route_transition/page_route_transition.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../homeUi.dart';
@@ -66,7 +65,7 @@ class AuthMethods {
         .addUserInfoToDB(
             userDetails.email!.replaceAll("@gmail.com", ""), userInfoMap)
         .then((value) {
-      PageRouteTransition.pushReplacement(context, HomeUi());
+      NavPush(context, HomeUi());
     });
   }
 

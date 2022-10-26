@@ -32,8 +32,8 @@ class DatabaseMethods {
         .snapshots();
   }
 
-  getAllNotes() async {
-    return await FirebaseFirestore.instance
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getAllNotes() {
+    return FirebaseFirestore.instance
         .collection("users")
         .doc(UserName.userName)
         .collection('notes')

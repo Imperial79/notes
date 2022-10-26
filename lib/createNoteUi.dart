@@ -1,15 +1,22 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:notes/constants.dart';
+import 'package:notes/sdp.dart';
 
 import 'globalColors.dart';
 import 'services/database.dart';
 import 'services/globalVariable.dart';
 
 class CreateNoteUi extends StatefulWidget {
-  String labelName;
+  final labelName;
+  final bool isEdit;
+  final DocumentSnapshot? data;
   CreateNoteUi({
     required this.labelName,
+    required this.isEdit,
+    this.data,
   });
 
   @override
@@ -24,26 +31,31 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
   LightColors lightColors = new LightColors();
   DarkColors darkColors = new DarkColors();
   String selectedColor = 'black';
+  String inFocus = 'title';
+  String savedCurrTime = DateTime.now().toString();
 
   NoteColors noteColors = new NoteColors();
 
   @override
   void initState() {
-    var formatter = DateFormat('dd MMMM, yyyy').format(DateTime.now());
-    displayTime = formatter;
+    if (widget.isEdit) {
+      titleController.text = widget.data!['title'];
+      contentController.text = widget.data!['content'];
+      savedCurrTime = widget.data!['time'];
+      selectedColor = widget.data!['color'];
+    }
     super.initState();
   }
 
-  saveNote(var DisplayTime, String currTime) {
-    String savedCurrTime = currTime;
-    if (titleController.text.isEmpty && contentController.text.isEmpty) {
-      Navigator.pop(context);
-    } else {
+  updateNote() {
+    if (widget.data!['title'] != titleController.text ||
+        widget.data!['content'] != contentController.text) {
       Map<String, String> noteMap = {
         'title': titleController.text,
         'content': contentController.text,
         'time': savedCurrTime,
-        'displayTime': DisplayTime,
+        'displayTime':
+            DateFormat('dd MMMM, yyyy').format(DateTime.parse(savedCurrTime)),
         'label': widget.labelName,
         'color': selectedColor,
       };
@@ -51,8 +63,32 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
       DatabaseMethods().uploadNotes(
           UserName.userName, noteMap, widget.labelName, savedCurrTime);
       Navigator.pop(context);
-      titleController.clear();
-      contentController.clear();
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  saveNote(var DisplayTime, String currTime) {
+    if (!widget.isEdit) {
+      savedCurrTime = currTime;
+    }
+    if (titleController.text.isEmpty && contentController.text.isEmpty) {
+      Navigator.pop(context);
+    } else {
+      Map<String, String> noteMap = {
+        'title': titleController.text,
+        'content': contentController.text,
+        'time': savedCurrTime,
+        'displayTime':
+            DateFormat('dd MMMM, yyyy').format(DateTime.parse(currTime)),
+        'label': widget.labelName,
+        'color': selectedColor,
+      };
+
+      DatabaseMethods().uploadNotes(
+          UserName.userName, noteMap, widget.labelName, savedCurrTime);
+      Navigator.pop(context);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: Duration(seconds: 1),
@@ -75,7 +111,7 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
               ),
             ],
           ),
-          backgroundColor: Colors.indigo,
+          backgroundColor: Colors.grey.shade800,
         ),
       );
     }
@@ -85,24 +121,22 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle.dark.copyWith(
-        statusBarIconBrightness:
-            selectedColor == 'white' || selectedColor == 'orange'
-                ? Brightness.dark
-                : Brightness.light,
         statusBarColor: Colors.transparent,
         systemNavigationBarColor: Colors.transparent,
       ),
     );
     Size size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: noteColors.colorPallete[selectedColor]['bg'],
       body: WillPopScope(
         onWillPop: () {
-          var formatter =
-              DateFormat('dd MMMM, yyyy | ').add_jm().format(DateTime.now());
-          String currentTime = DateTime.now().toString();
+          if (!widget.isEdit) {
+            var formatter =
+                DateFormat('dd MMMM, yyyy | ').add_jm().format(DateTime.now());
+            String currentTime = DateTime.now().toString();
 
-          return saveNote(formatter, currentTime);
+            return saveNote(formatter, currentTime);
+          }
+          return updateNote();
         },
         child: SafeArea(
           bottom: false,
@@ -111,42 +145,67 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () {
-                    var formatter = DateFormat('dd MMMM, yyyy | ')
-                        .add_jm()
-                        .format(DateTime.now());
-                    String currentTime = DateTime.now().toString();
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        var formatter = DateFormat('dd MMMM, yyyy | ')
+                            .add_jm()
+                            .format(DateTime.now());
+                        String currentTime = DateTime.now().toString();
 
-                    return saveNote(formatter, currentTime);
-                  },
-                  child: Container(
-                    margin: EdgeInsets.only(top: 10, left: 20),
-                    padding: EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(50),
-                      border: Border.all(
-                        color: noteColors.colorPallete[selectedColor]['text'],
+                        return saveNote(formatter, currentTime);
+                      },
+                      icon: Icon(
+                        Icons.close,
+                        // color: noteColors.colorPallete[selectedColor]['text'],
+                        color: isDark ? Colors.white : Colors.black,
                       ),
                     ),
-                    child: Icon(
-                      Icons.arrow_back,
-                      color: noteColors.colorPallete[selectedColor]['text'],
-                      size: 20,
+                    Flexible(
+                      child: Container(
+                        margin: EdgeInsets.only(right: 10),
+                        padding:
+                            EdgeInsets.symmetric(vertical: 5, horizontal: 13),
+                        decoration: BoxDecoration(
+                          color: noteColors.colorPallete[selectedColor]
+                              ['labelCard'],
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          widget.labelName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            // fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 TextFormField(
+                  onTap: () {
+                    setState(() {
+                      inFocus = 'title';
+                    });
+                  },
                   controller: titleController,
-                  cursorColor: noteColors.colorPallete[selectedColor]['text'],
+                  // cursorColor: noteColors.colorPallete[selectedColor]['text'],
+                  cursorColor: isDark ? Colors.white : Colors.black,
                   style: TextStyle(
-                    fontSize: 25,
-                    color: noteColors.colorPallete[selectedColor]['text'],
+                    fontSize: sdp(context, 30),
+                    // color: noteColors.colorPallete[selectedColor]['text'],
+                    color: isDark ? Colors.white : Colors.black,
+                    overflow: TextOverflow.ellipsis,
                     fontWeight: FontWeight.w800,
                   ),
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.words,
-                  maxLines: 1,
+                  maxLines: inFocus == 'title' ? 2 : 1,
+                  minLines: 1,
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.all(15),
@@ -164,185 +223,191 @@ class _CreateNoteUiState extends State<CreateNoteUi> {
                     return null;
                   },
                 ),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 5, horizontal: 13),
-                  decoration: BoxDecoration(
-                    color: noteColors.colorPallete[selectedColor]['labelCard'],
-                  ),
-                  child: Text(
-                    'LABEL: ' + widget.labelName,
-                    style: TextStyle(
-                      color: Colors.white,
-                      // fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
                 Expanded(
-                  child: TextFormField(
-                    controller: contentController,
-                    cursorColor: noteColors.colorPallete[selectedColor]['text'],
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: noteColors.colorPallete[selectedColor]['text'],
-                      fontWeight: FontWeight.w500,
-                    ),
-                    keyboardType: TextInputType.multiline,
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLines: 17,
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(15),
-                      hintText: 'Note...',
-                      hintStyle: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: noteColors.colorPallete[selectedColor]
-                            ['hintText'],
+                  child: AnimatedContainer(
+                    duration: Duration(milliseconds: 300),
+                    margin: EdgeInsets.symmetric(
+                        horizontal: contentController.text.isEmpty ? 10 : 0),
+                    decoration: BoxDecoration(
+                      // color: isDark ? Colors.grey : Colors.grey.shade100,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          noteColors.colorPallete[selectedColor]['labelCard']
+                              .withOpacity(0.005),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextFormField(
+                      onTap: () {
+                        setState(() {
+                          inFocus = 'content';
+                        });
+                      },
+                      controller: contentController,
+                      // cursorColor: noteColors.colorPallete[selectedColor]
+                      //     ['text'],
+                      cursorColor: isDark ? Colors.white : Colors.black,
+                      style: TextStyle(
+                        fontSize: 18,
+                        // color: noteColors.colorPallete[selectedColor]['text'],
+                        color: isDark ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      keyboardType: TextInputType.multiline,
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLines: 17,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(15),
+                        hintText: 'Note...',
+                        hintStyle: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: noteColors.colorPallete[selectedColor]
+                              ['hintText'],
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {});
+                      },
                     ),
                   ),
                 ),
-                MediaQuery.of(context).viewInsets.bottom == 0
-                    ? Padding(
-                        padding:
-                            EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            CircleAvatar(
-                              radius: 26,
-                              backgroundColor: Colors.grey.withOpacity(0.4),
-                              child: IconButton(
-                                onPressed: () {
-                                  FocusScope.of(context).unfocus();
-                                  showModalBottomSheet(
-                                    // isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(20),
-                                        topRight: Radius.circular(20),
-                                      ),
-                                    ),
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return ColorSheet(size);
-                                    },
-                                  );
-                                },
-                                icon: Icon(
-                                  Icons.palette,
-                                  color: noteColors.colorPallete[selectedColor]
-                                      ['text'],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Container(),
               ],
             ),
           ),
         ),
       ),
+      floatingActionButton: MediaQuery.of(context).viewInsets.bottom == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                showModalBottomSheet(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  context: context,
+                  builder: (BuildContext context) {
+                    return ColorSheet(size);
+                  },
+                );
+              },
+              elevation: 0,
+              backgroundColor: noteColors.colorPallete[selectedColor]
+                  ['labelCard'],
+              child: Icon(
+                Icons.colorize,
+                color: noteColors.colorPallete[selectedColor]['text'],
+              ),
+            )
+          : null,
     );
   }
 
   Widget ColorSheet(Size size) {
-    return StatefulBuilder(
-      builder: (context, StateSetter setModalState) {
-        return Container(
-          margin: EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: noteColors.colorPallete[selectedColor]['bg'],
-            borderRadius: BorderRadius.circular(15),
-          ),
-          height: size.height * 0.165,
-          width: double.infinity,
-          padding: EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children:
-                    List.generate(noteColors.colorPallete.keys.length, (index) {
-                  final colorKey =
-                      noteColors.colorPallete.keys.elementAt(index);
-                  return Padding(
-                    padding: EdgeInsets.only(right: 5),
-                    child: GestureDetector(
-                      onTap: () {
-                        setModalState(() {
-                          selectedColor = colorKey;
-                          print(selectedColor);
-                        });
+    return SafeArea(
+      child: StatefulBuilder(
+        builder: (context, StateSetter setModalState) {
+          return Container(
+            margin: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              // color: noteColors.colorPallete[selectedColor]['bg'],
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            height: sdp(context, 100),
+            width: double.infinity,
+            padding: EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(noteColors.colorPallete.keys.length,
+                      (index) {
+                    final colorKey =
+                        noteColors.colorPallete.keys.elementAt(index);
+                    return Padding(
+                      padding: EdgeInsets.only(right: 5),
+                      child: GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            selectedColor = colorKey;
+                            print(selectedColor);
+                          });
 
-                        setState(() {});
-                      },
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: noteColors.colorPallete[colorKey]
-                            ['bg'],
-                        child: selectedColor == colorKey
-                            ? Icon(
-                                Icons.done,
-                                color: selectedColor == 'white' ||
-                                        selectedColor == 'orange'
-                                    ? Colors.black
-                                    : Colors.white,
-                              )
-                            : Container(),
+                          setState(() {});
+                        },
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: noteColors.colorPallete[colorKey]
+                              ['bg'],
+                          child: selectedColor == colorKey
+                              ? Icon(
+                                  Icons.done,
+                                  color: selectedColor == 'white' ||
+                                          selectedColor == 'orange'
+                                      ? Colors.black
+                                      : Colors.white,
+                                )
+                              : Container(),
+                        ),
                       ),
-                    ),
-                  );
-                }),
-              ),
-              SizedBox(
-                height: 20,
-              ),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: displayTime,
-                      style: TextStyle(
-                        color: noteColors.colorPallete[selectedColor]['text'],
-                        fontWeight: FontWeight.w700,
-                        fontSize: size.height * 0.017,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' | ',
-                      style: TextStyle(
-                        color: noteColors.colorPallete[selectedColor]['text'],
-                        fontWeight: FontWeight.w700,
-                        fontSize: size.height * 0.019,
-                      ),
-                    ),
-                    TextSpan(
-                      text: contentController.text.length.toString() + ' words',
-                      style: TextStyle(
-                        color: noteColors.colorPallete[selectedColor]['text'],
-                        fontWeight: FontWeight.w700,
-                        fontSize: size.height * 0.017,
-                      ),
-                    ),
-                  ],
+                    );
+                  }),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+                SizedBox(
+                  height: 20,
+                ),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text:
+                            DateFormat('dd MMMM, yyyy').format(DateTime.now()),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
+                          fontSize: size.height * 0.017,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' | ',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
+                          fontSize: size.height * 0.019,
+                        ),
+                      ),
+                      TextSpan(
+                        text:
+                            contentController.text.length.toString() + ' words',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
+                          fontSize: size.height * 0.017,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget buildColorSwatch(String colorKey) {
-    Size size = MediaQuery.of(context).size;
     return Padding(
       padding: EdgeInsets.only(right: 5),
       child: GestureDetector(

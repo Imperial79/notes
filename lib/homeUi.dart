@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:page_route_transition/page_route_transition.dart';
+import 'package:notes/sdp.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'Functions/functions.dart';
+import 'package:speed_dial_fab/speed_dial_fab.dart';
+import 'constants.dart';
 import 'createNoteUi.dart';
 import 'editNoteContentUi.dart';
 import 'globalColors.dart';
 import 'services/auth.dart';
 import 'services/database.dart';
 import 'services/globalVariable.dart';
-import 'signInUi.dart';
+import 'logInUI.dart';
 
 class HomeUi extends StatefulWidget {
   const HomeUi({Key? key}) : super(key: key);
@@ -54,19 +54,21 @@ class _HomeUiState extends State<HomeUi> {
       setState(() {});
     }
 
-    selectedLabel == 'All'
-        ? DatabaseMethods().getAllNotes().then((value) {
-            setState(() {
-              noteStream = value;
-            });
-          })
-        : DatabaseMethods()
-            .getNotesByLabel(UserName.userName, selectedLabel)
-            .then((value) {
-            setState(() {
-              noteStream = value;
-            });
-          });
+    // selectedLabel == 'All'
+    //     ?
+
+    // DatabaseMethods().getAllNotes().then((value) {
+    //   setState(() {
+    //     noteStream = value;
+    //   });
+    // });
+    // : DatabaseMethods()
+    //     .getNotesByLabel(UserName.userName, selectedLabel)
+    //     .then((value) {
+    //     setState(() {
+    //       noteStream = value;
+    //     });
+    //   });
 
     DatabaseMethods().getlabel().then((value) {
       setState(() {
@@ -97,7 +99,8 @@ class _HomeUiState extends State<HomeUi> {
         labelList = labelSet.toList();
 
         DatabaseMethods().updatelabel(labelList!);
-        PageRouteTransition.pop(context);
+
+        Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -142,13 +145,19 @@ class _HomeUiState extends State<HomeUi> {
       stream: labelStream,
       builder: (context, snapshot) {
         return (snapshot.hasData)
-            ? Row(
-                children: List.generate(
-                  snapshot.data.docs[0]['labelList'].length,
-                  (index) {
-                    DocumentSnapshot ds = snapshot.data.docs[0];
-                    return LabelButton(ds['labelList'][index]);
-                  },
+            ? Padding(
+                padding: EdgeInsets.only(left: 10.0),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: List.generate(
+                      snapshot.data.docs[0]['labelList'].length,
+                      (index) {
+                        DocumentSnapshot ds = snapshot.data.docs[0];
+                        return LabelButton(ds['labelList'][index]);
+                      },
+                    ),
+                  ),
                 ),
               )
             : Container();
@@ -158,15 +167,14 @@ class _HomeUiState extends State<HomeUi> {
 
   Widget NotesList() {
     return StreamBuilder<dynamic>(
-      stream: noteStream,
+      stream: DatabaseMethods.getAllNotes(),
       builder: (context, snapshot) {
         return (snapshot.hasData)
             ? (snapshot.data.docs.length == 0)
                 ? Padding(
-                    padding: EdgeInsets.only(top: 100),
+                    padding: EdgeInsets.only(top: sdp(context, 90), left: 15),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Create Notes',
@@ -189,30 +197,25 @@ class _HomeUiState extends State<HomeUi> {
                       ],
                     ),
                   )
-                : StaggeredGrid.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    children: List.generate(
-                      snapshot.data.docs.length,
-                      (index) {
-                        DocumentSnapshot ds = snapshot.data.docs[index];
-                        return Dismissible(
-                          background: Text(
-                            'Delete this ...',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          key: UniqueKey(),
-                          onDismissed: (direction) {
-                            deleteANote(ds['time'], ds['label']);
-                          },
-                          child: NotesCard(ds),
-                        );
-                      },
+                : Padding(
+                    padding: EdgeInsets.only(left: 10, right: 10, top: 10),
+                    child: StaggeredGrid.count(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      children: List.generate(
+                        snapshot.data.docs.length,
+                        (index) {
+                          DocumentSnapshot ds = snapshot.data.docs[index];
+
+                          if (selectedLabel == 'All') {
+                            return NotesCard(ds);
+                          } else if (ds['label'].contains(selectedLabel)) {
+                            return NotesCard(ds);
+                          }
+                          return SizedBox();
+                        },
+                      ),
                     ),
                   )
             : Center(
@@ -229,125 +232,38 @@ class _HomeUiState extends State<HomeUi> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle.light.copyWith(
-        statusBarIconBrightness: Brightness.light,
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
-      ),
-    );
-    Size size = MediaQuery.of(context).size;
+    isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: Colors.black,
-      body: Container(
-        decoration: BoxDecoration(),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              SizedBox(
-                height: 10,
-              ),
-              Container(
-                width: double.infinity,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Notes.',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: size.height * 0.04,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              _scaffoldKey.currentState?.openDrawer();
-                            },
-                            child: CircleAvatar(
-                              backgroundColor: Colors.grey.shade600,
-                              radius: 20,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(50),
-                                child: UserName.userProfilePic == ''
-                                    ? CircularProgressIndicator(
-                                        color: Colors.white,
-                                      )
-                                    : Image.network(
-                                        UserName.userProfilePic,
-                                        fit: BoxFit.cover,
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // SizedBox(
-                      //   height: 10,
-                      // ),
-                      // Container(
-                      //   child: SingleChildScrollView(
-                      //     scrollDirection: Axis.horizontal,
-                      //     physics: BouncingScrollPhysics(),
-                      //     child: GetLabelList(),
-                      //   ),
-                      // ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: BouncingScrollPhysics(),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Stack(
-                      // crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Padding(
-                            padding: EdgeInsets.only(top: 60),
-                            child: NotesList(),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.topCenter,
-                          child: ClipRRect(
-                            child: BackdropFilter(
-                              filter:
-                                  ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                              child: Container(
-                                color: Colors.black.withOpacity(0.4),
-                                width: double.infinity,
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  physics: BouncingScrollPhysics(),
-                                  child: GetLabelList(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            ],
+      backgroundColor: isDark ? Colors.black : Colors.white,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.medium(
+            leadingWidth: 0,
+            title: Text(
+              'Notes.',
+              // style: TextStyle(
+              //   color: isDark ? Colors.white : Colors.black,
+              //   fontSize: sdp(context, 20),
+              //   fontWeight: FontWeight.w700,
+              // ),
+            ),
+            toolbarTextStyle: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+              fontSize: sdp(context, 30),
+              fontWeight: FontWeight.w700,
+            ),
+            automaticallyImplyLeading: false,
           ),
-        ),
+          SliverList(
+            delegate: SliverChildListDelegate.fixed(
+              [
+                GetLabelList(),
+                NotesList(),
+              ],
+            ),
+          ),
+        ],
       ),
       floatingActionButton: SpeedDial(
         spaceBetweenChildren: 20,
@@ -363,13 +279,12 @@ class _HomeUiState extends State<HomeUi> {
         children: [
           SpeedDialChild(
             onTap: () {
-              PageRouteTransition.push(
+              NavPush(
                   context,
                   CreateNoteUi(
                     labelName: selectedLabel,
-                  )).then((value) {
-                setState(() {});
-              });
+                    isEdit: false,
+                  ));
             },
             child: Icon(Icons.note_add),
             labelWidget: Text(
@@ -401,99 +316,6 @@ class _HomeUiState extends State<HomeUi> {
             elevation: 0,
           ),
         ],
-      ),
-      drawer: Drawer(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        backgroundColor: Colors.blueGrey.shade800,
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: EdgeInsets.only(
-                    bottom: 15,
-                    top: 50,
-                    left: 15,
-                  ),
-                  height: 100,
-                  width: 100,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 10,
-                    ),
-                  ),
-                  child: UserName.userProfilePic == ''
-                      ? CircularProgressIndicator(
-                          color: Colors.grey.shade700,
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(100),
-                          child: Image.network(
-                            UserName.userProfilePic,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 15),
-                  child: Text(
-                    UserName.userDisplayName.replaceAll(' ', '\n'),
-                    style: TextStyle(
-                      fontSize: size.height * 0.03,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 20,
-                ),
-              ],
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: EdgeInsets.only(bottom: size.height * 0.05),
-                child: MaterialButton(
-                  onPressed: () async {
-                    AuthMethods().signOut();
-                    PageRouteTransition.pushReplacement(context, SignInUi());
-
-                    SharedPreferences preferences =
-                        await SharedPreferences.getInstance();
-                    await preferences.clear();
-                  },
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                  ),
-                  color: Colors.red,
-                  child: Container(
-                    height: 45,
-                    padding: EdgeInsets.all(10),
-                    width: double.infinity,
-                    child: Center(
-                      child: Text(
-                        'SIGN OUT',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -588,20 +410,15 @@ class _HomeUiState extends State<HomeUi> {
   }
 
   Widget LabelButton(String name) {
-    int nameLength = name.length;
     return Padding(
-      padding: EdgeInsets.only(right: 7),
-      child: MaterialButton(
-        onPressed: () {
+      padding: EdgeInsets.only(right: 8.0),
+      child: GestureDetector(
+        onTap: () {
           setState(() {
             selectedLabel = name;
           });
           selectedLabel == 'All'
-              ? DatabaseMethods().getAllNotes().then((value) {
-                  setState(() {
-                    noteStream = value;
-                  });
-                })
+              ? noteStream = DatabaseMethods.getAllNotes()
               : DatabaseMethods()
                   .getNotesByLabel(UserName.userName, selectedLabel)
                   .then(
@@ -612,110 +429,155 @@ class _HomeUiState extends State<HomeUi> {
                   },
                 );
         },
-        elevation: 0,
-        highlightElevation: 0,
-        color: selectedLabel == name
-            ? Colors.orange.withOpacity(0.5)
-            : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50),
-          side: BorderSide(
-            color: selectedLabel == name
-                ? Colors.transparent
-                : Colors.grey.shade600,
-            width: 1,
+        child: Chip(
+          padding: EdgeInsets.symmetric(horizontal: 7),
+          label: Text(name),
+          labelStyle: TextStyle(
+            color: selectedLabel == name ? Colors.white : Colors.grey,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        child: Container(
-          child: Text(
-            name,
-            style: TextStyle(
-              fontSize: selectedLabel == name ? 17 : 15,
-              fontWeight: FontWeight.w900,
-              color: selectedLabel == name
-                  ? Color.fromARGB(255, 231, 234, 255)
-                  : Colors.grey.shade600,
-            ),
-          ),
+          backgroundColor: selectedLabel == name
+              ? Color.fromARGB(255, 57, 74, 206)
+              : Colors.grey.shade200,
         ),
       ),
     );
+    // return InkWell(
+    //   onTap: () {
+    // setState(() {
+    //   selectedLabel = name;
+    // });
+    // selectedLabel == 'All'
+    //     ? DatabaseMethods().getAllNotes().then((value) {
+    //         setState(() {
+    //           noteStream = value;
+    //         });
+    //       })
+    //     : DatabaseMethods()
+    //         .getNotesByLabel(UserName.userName, selectedLabel)
+    //         .then(
+    //         (value) {
+    //           setState(() {
+    //             noteStream = value;
+    //           });
+    //         },
+    //       );
+    //   },
+    //   child: Container(
+    //     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    //     margin: EdgeInsets.only(right: 7),
+    //     decoration: BoxDecoration(
+    //       borderRadius: BorderRadius.circular(7),
+    //       color: selectedLabel == name
+    //           ? Colors.orange.withOpacity(0.5)
+    //           : Colors.transparent,
+    //     ),
+    //     child: Text(
+    //       name,
+    //       style: TextStyle(
+    //         fontSize: selectedLabel == name ? 17 : 15,
+    //         fontWeight: FontWeight.w900,
+    //         color: selectedLabel == name
+    //             ? Color.fromARGB(255, 231, 234, 255)
+    //             : Colors.grey.shade600,
+    //       ),
+    //     ),
+    //   ),
+    // );
   }
 
   Widget NotesCard(final ds) {
-    return GestureDetector(
-      onTap: () {
-        PageRouteTransition.push(
-            context,
-            NoteContentUi(
-              title: ds['title'],
-              content: ds['content'],
-              time: ds['time'],
-              displayTime: ds['displayTime'],
-              label: ds['label'],
-              color: ds['color'],
-            )).then((value) {
-          setState(() {});
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          // color: color,
-          color: noteColors.colorPallete[ds['color']]['bg'],
-          borderRadius: BorderRadius.circular(15),
+    return Dismissible(
+      background: Text(
+        'Delete this ...',
+        style: TextStyle(
+          color: Colors.grey,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              ds['title'] == '' ? 'no title' : ds['title'],
-              style: TextStyle(
-                color: ds['title'] == ''
-                    ? noteColors.colorPallete[ds['color']]['hintText']
-                    : noteColors.colorPallete[ds['color']]['text'],
-                fontWeight: FontWeight.w900,
-                fontSize: 22,
-                fontStyle:
-                    ds['title'] == '' ? FontStyle.italic : FontStyle.normal,
-              ),
-            ),
-            SizedBox(
-              height: 10,
-            ),
-            Text(
-              ds['content'] == '' ? 'no content' : ds['content'],
-              style: TextStyle(
-                color: ds['content'] == ''
-                    ? noteColors.colorPallete[ds['color']]['hintText']
-                    : noteColors.colorPallete[ds['color']]['text'],
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                fontStyle:
-                    ds['content'] == '' ? FontStyle.italic : FontStyle.normal,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 15,
-            ),
-            Container(
-              width: double.infinity,
-              margin: EdgeInsets.only(top: 15),
-              padding: EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(50),
-                color: Colors.black,
-              ),
-              child: Text(
-                ds['displayTime'],
+      ),
+      key: UniqueKey(),
+      onDismissed: (direction) {
+        deleteANote(ds['time'], ds['label']);
+      },
+      child: GestureDetector(
+        onTap: () {
+          NavPush(
+              context,
+              // NoteContentUi(
+              //   title: ds['title'],
+              //   content: ds['content'],
+              //   time: ds['time'],
+              //   displayTime: ds['displayTime'],
+              //   label: ds['label'],
+              //   color: ds['color'],
+              // ));
+
+              CreateNoteUi(
+                labelName: ds['label'],
+                isEdit: true,
+                data: ds,
+              ));
+        },
+        child: Container(
+          padding: EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            // color: color,
+            color: noteColors.colorPallete[ds['color']]['bg'],
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ds['title'] == '' ? 'no title' : ds['title'],
                 style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10,
+                  color: ds['title'] == ''
+                      ? noteColors.colorPallete[ds['color']]['hintText']
+                      : noteColors.colorPallete[ds['color']]['text'],
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  fontStyle:
+                      ds['title'] == '' ? FontStyle.italic : FontStyle.normal,
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              SizedBox(
+                height: 10,
+              ),
+              Text(
+                ds['content'] == '' ? 'no content' : ds['content'],
+                style: TextStyle(
+                  color: ds['content'] == ''
+                      ? noteColors.colorPallete[ds['color']]['hintText']
+                      : noteColors.colorPallete[ds['color']]['text'],
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontStyle:
+                      ds['content'] == '' ? FontStyle.italic : FontStyle.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 15,
+              ),
+              Container(
+                width: double.infinity,
+                margin: EdgeInsets.only(top: 15),
+                padding: EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(50),
+                  color: Colors.black,
+                ),
+                child: Text(
+                  ds['displayTime'],
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
